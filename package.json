@@ -1,0 +1,19 @@
+{
+  "name": "jiratui",
+  "version": "0.1.0",
+  "description": "A TUI for JIRA supporting both Cloud and On-Premise instances",
+  "type": "module",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "bun run src/main.ts",
+    "dev": "bun run --watch src/main.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.1.72"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}
