@@ -15,6 +15,9 @@ const GRAY = "#7A869A"
 export function createJqlSearchScreen(ctx: AppContext): void {
   const { renderer } = ctx
 
+  // Clear previous query so new searches work correctly
+  ctx.jqlQuery = null
+
   const mainContainer = new BoxRenderable(renderer, {
     id: "main-container",
     width: "100%",
