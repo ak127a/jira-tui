@@ -48,26 +48,39 @@ abstract class BaseJiraClient implements JiraClient {
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`
 
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        Authorization: this.authHeader,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        ...options.headers,
-      },
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000)
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new JiraApiError(
-        `JIRA API Error: ${response.status} ${response.statusText}`,
-        response.status,
-        errorText
-      )
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          Authorization: this.authHeader,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...options.headers,
+        },
+      })
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new JiraApiError(
+          `JIRA API Error: ${response.status} ${response.statusText}`,
+          response.status,
+          errorText
+        )
+      }
+
+      return response.json() as Promise<T>
+    } catch (err) {
+      clearTimeout(timeoutId)
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new JiraApiError("Request timed out", 408, "")
+      }
+      throw err
     }
-
-    return response.json() as Promise<T>
   }
 
   abstract getProjects(): Promise<JiraProject[]>

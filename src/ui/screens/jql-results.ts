@@ -216,8 +216,7 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
         selectedIssueIndices.clear()
         renderTable()
       }
-    }).catch((err) => {
-      Bun.write("/tmp/jiratui-debug.log", `createBulkEditScreen error: ${err}\n`, { append: true })
+    }).catch(() => {
       isInBulkEditMode = false
     })
   }

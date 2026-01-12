@@ -233,7 +233,6 @@ export function createFieldSelector(
   render()
 
   const keyHandler = (key: KeyEvent) => {
-    Bun.write("/tmp/jiratui-debug.log", `field-selector key: ${key.name}\n`, { append: true })
     const filtered = getFilteredFields()
 
     if (key.name === "escape") {
@@ -247,7 +246,6 @@ export function createFieldSelector(
       renderer.keyInput.off("keypress", keyHandler)
       parent.remove("field-selector-container")
       const selected = AVAILABLE_FIELDS.filter((f) => selectedFields.has(f.key))
-      Bun.write("/tmp/jiratui-debug.log", `selected fields: ${JSON.stringify(selected)}, count: ${selected.length}\n`, { append: true })
       onComplete({ selectedFields: selected, cancelled: false })
       return
     }

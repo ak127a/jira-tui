@@ -35,19 +35,15 @@ export async function createBulkEditScreen(
   client: JiraClient,
   onComplete: (result: BulkEditResult) => void
 ): Promise<{ destroy: () => void }> {
-  Bun.write("/tmp/jiratui-debug.log", `createBulkEditScreen called with ${issueKeys.length} issues, ${fields.length} fields\n`, { append: true })
   let currentFieldIndex = 0
   let isEditing = false
   const fieldValues: FieldValue[] = []
   let fieldRowIds: string[] = []
 
   for (const field of fields) {
-    Bun.write("/tmp/jiratui-debug.log", `Processing field: ${field.key}, type: ${field.type}\n`, { append: true })
     const fv: FieldValue = { field, value: "" }
     if (field.type === "choice") {
-      Bun.write("/tmp/jiratui-debug.log", `Fetching options for ${field.key}...\n`, { append: true })
       const options = await client.getFieldOptions(field.key)
-      Bun.write("/tmp/jiratui-debug.log", `Got ${options.length} options\n`, { append: true })
       fv.options = options
       fv.optionIndex = 0
       fv.value = options[0]?.value ?? ""
@@ -55,7 +51,6 @@ export async function createBulkEditScreen(
     }
     fieldValues.push(fv)
   }
-  Bun.write("/tmp/jiratui-debug.log", `Done processing fields, creating UI...\n`, { append: true })
 
   const container = new BoxRenderable(renderer, {
     id: "bulk-edit-container",
