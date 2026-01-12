@@ -120,7 +120,7 @@ export async function createProjectsScreen(ctx: AppContext): Promise<void> {
     if (key.name === "escape") {
       ctx.navigate("main_menu")
     } else if (key.name === "q") {
-      renderer.stop()
+      renderer.destroy()
       process.exit(0)
     }
   }

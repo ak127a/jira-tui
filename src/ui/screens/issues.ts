@@ -175,7 +175,7 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
     if (key.name === "escape") {
       ctx.navigate("main_menu")
     } else if (key.name === "q") {
-      renderer.stop()
+      renderer.destroy()
       process.exit(0)
     } else if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
       if (selectedIndex > 0) {

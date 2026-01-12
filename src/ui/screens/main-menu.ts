@@ -94,7 +94,7 @@ export function createMainMenuScreen(ctx: AppContext): void {
     if (key.name === "escape") {
       ctx.navigate("landing")
     } else if (key.name === "q") {
-      renderer.stop()
+      renderer.destroy()
       process.exit(0)
     }
   }

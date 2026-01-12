@@ -88,7 +88,7 @@ export function createJqlSearchScreen(ctx: AppContext): void {
       queryInput.blur()
       ctx.navigate("main_menu")
     } else if (key.name === "q" && !queryInput.focused) {
-      renderer.stop()
+      renderer.destroy()
       process.exit(0)
     } else if (key.name === "return") {
       const query = queryInput.value.trim()

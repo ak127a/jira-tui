@@ -69,7 +69,7 @@ async function main(): Promise<void> {
 
   renderer.keyInput.on("keypress", (key: KeyEvent) => {
     if (key.name === "q" && ctx.currentScreen === "landing") {
-      renderer.stop()
+      renderer.destroy()
       process.exit(0)
     }
   })

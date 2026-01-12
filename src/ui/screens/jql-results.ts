@@ -101,7 +101,7 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
 
   const helpText = new TextRenderable(renderer, {
     id: "help",
-    content: "↑/↓/j/k Nav  •  Ctrl+j Next Page  •  Ctrl+k Prev Page  •  Esc Back  •  q Quit",
+    content: "↑/↓/j/k Nav  •  n Next Page  •  p Prev Page  •  Esc Back  •  q Quit",
     fg: GRAY,
   })
   statusBar.add(helpText)
@@ -184,7 +184,7 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     if (key.name === "escape") {
       ctx.navigate("jql_search")
     } else if (key.name === "q") {
-      renderer.stop()
+      renderer.destroy()
       process.exit(0)
     } else if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
       if (selectedIndex > 0) {
@@ -204,14 +204,14 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
         }
         renderTable()
       }
-    } else if (key.name === "j" && key.ctrl) {
+    } else if (key.name === "n") {
       const totalPages = getTotalPages()
       if (currentPage < totalPages - 1) {
         currentPage++
         selectedIndex = currentPage * PAGE_SIZE
         renderTable()
       }
-    } else if (key.name === "k" && key.ctrl) {
+    } else if (key.name === "p") {
       if (currentPage > 0) {
         currentPage--
         selectedIndex = currentPage * PAGE_SIZE
