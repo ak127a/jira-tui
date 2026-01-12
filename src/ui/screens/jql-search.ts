@@ -85,6 +85,7 @@ export function createJqlSearchScreen(ctx: AppContext): void {
     if (ctx.currentScreen !== "jql_search") return
 
     if (key.name === "escape") {
+      queryInput.blur()
       ctx.navigate("main_menu")
     } else if (key.name === "q" && !queryInput.focused) {
       renderer.stop()
@@ -93,6 +94,7 @@ export function createJqlSearchScreen(ctx: AppContext): void {
       const query = queryInput.value.trim()
       if (query) {
         ctx.jqlQuery = query
+        queryInput.blur()
         ctx.navigate("jql_results")
       }
     }
