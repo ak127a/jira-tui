@@ -8,6 +8,8 @@ const WHITE = "#FFFFFF"
 const GRAY = "#7A869A"
 const DARK_BG = "#1a1a1a"
 const HEADER_BG = "#2d333b"
+const SELECTED_BG = "#1c3d5a"
+const SELECTED_MARKER = "◆"
 
 export interface TableColumn {
   key: string
@@ -26,6 +28,7 @@ export interface TableOptions {
   width?: number | `${number}%`
   maxHeight?: number
   selectedIndex?: number
+  selectedRows?: Set<number>
 }
 
 function truncate(str: string, maxLen: number): string {
@@ -82,23 +85,39 @@ export function createTable(
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
-    const isSelected = i === options.selectedIndex
+    const isCursor = i === options.selectedIndex
+    const isMarked = options.selectedRows?.has(i) ?? false
+
+    let bgColor = i % 2 === 0 ? DARK_BG : "#22272e"
+    if (isCursor) {
+      bgColor = "#0052CC"
+    } else if (isMarked) {
+      bgColor = SELECTED_BG
+    }
 
     const rowBox = new BoxRenderable(renderer, {
       id: `${id}-row-${i}`,
       width: "100%",
       height: 1,
       flexDirection: "row",
-      backgroundColor: isSelected ? "#0052CC" : (i % 2 === 0 ? DARK_BG : "#22272e"),
+      backgroundColor: bgColor,
     })
     tableBox.add(rowBox)
+
+    const marker = new TextRenderable(renderer, {
+      id: `${id}-marker-${i}`,
+      content: isMarked ? SELECTED_MARKER : " ",
+      fg: "#00d4aa",
+      width: 2,
+    })
+    rowBox.add(marker)
 
     for (const col of columns) {
       const cellValue = row[col.key] ?? ""
       const cell = new TextRenderable(renderer, {
         id: `${id}-cell-${i}-${col.key}`,
         content: truncate(cellValue, col.width),
-        fg: isSelected ? WHITE : GRAY,
+        fg: isCursor ? WHITE : (isMarked ? "#00d4aa" : GRAY),
         width: col.width,
         marginRight: 1,
       })

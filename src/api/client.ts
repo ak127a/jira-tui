@@ -6,6 +6,12 @@ import type {
   SearchOptions,
 } from "./types"
 
+export interface FieldOption {
+  id: string
+  value: string
+  name?: string
+}
+
 export interface JiraClient {
   readonly config: JiraConfig
   readonly isCloud: boolean
@@ -13,6 +19,9 @@ export interface JiraClient {
   getProjects(): Promise<JiraProject[]>
   searchIssues(options: SearchOptions): Promise<JiraSearchResponse>
   getProjectIssues(projectKey: string, options?: Omit<SearchOptions, "jql">): Promise<JiraSearchResponse>
+  updateIssue(issueKey: string, fields: Record<string, unknown>): Promise<void>
+  getFieldOptions(fieldName: string, projectKey?: string): Promise<FieldOption[]>
+  getFieldId(fieldName: string): Promise<string | null>
 }
 
 abstract class BaseJiraClient implements JiraClient {
@@ -63,6 +72,9 @@ abstract class BaseJiraClient implements JiraClient {
 
   abstract getProjects(): Promise<JiraProject[]>
   abstract searchIssues(options: SearchOptions): Promise<JiraSearchResponse>
+  abstract updateIssue(issueKey: string, fields: Record<string, unknown>): Promise<void>
+  abstract getFieldOptions(fieldName: string, projectKey?: string): Promise<FieldOption[]>
+  abstract getFieldId(fieldName: string): Promise<string | null>
 
   async getProjectIssues(
     projectKey: string,
@@ -99,6 +111,49 @@ class CloudJiraClient extends BaseJiraClient {
 
     return this.request<JiraSearchResponse>(`${this.apiBase}/search?${params}`)
   }
+
+  async updateIssue(issueKey: string, fields: Record<string, unknown>): Promise<void> {
+    await this.request<void>(`${this.apiBase}/issue/${issueKey}`, {
+      method: "PUT",
+      body: JSON.stringify({ fields }),
+    })
+  }
+
+  async getFieldId(fieldName: string): Promise<string | null> {
+    try {
+      const fields = await this.request<Array<{ id: string; name: string }>>(
+        `${this.apiBase}/field`
+      )
+      const field = fields.find((f) => f.name.toLowerCase() === fieldName.toLowerCase())
+      return field?.id ?? null
+    } catch {
+      return null
+    }
+  }
+
+  async getFieldOptions(fieldName: string, _projectKey?: string): Promise<FieldOption[]> {
+    if (fieldName.toLowerCase() === "severity") {
+      const fieldId = await this.getFieldId("Severity")
+      if (fieldId) {
+        try {
+          const response = await this.request<{ values: Array<{ id: string; value: string }> }>(
+            `${this.apiBase}/field/${fieldId}/context/default/option`
+          )
+          return response.values.map((v) => ({ id: v.id, value: v.value }))
+        } catch {
+          // Fall through to defaults
+        }
+      }
+      return [
+        { id: "1", value: "1 - Critical" },
+        { id: "2", value: "2 - High" },
+        { id: "3", value: "3 - Medium" },
+        { id: "4", value: "4 - Low" },
+        { id: "5", value: "5 - Trivial" },
+      ]
+    }
+    return []
+  }
 }
 
 class DataCenterJiraClient extends BaseJiraClient {
@@ -127,6 +182,51 @@ class DataCenterJiraClient extends BaseJiraClient {
       method: "POST",
       body: JSON.stringify(body),
     })
+  }
+
+  async updateIssue(issueKey: string, fields: Record<string, unknown>): Promise<void> {
+    await this.request<void>(`${this.apiBase}/issue/${issueKey}`, {
+      method: "PUT",
+      body: JSON.stringify({ fields }),
+    })
+  }
+
+  async getFieldId(fieldName: string): Promise<string | null> {
+    try {
+      const fields = await this.request<Array<{ id: string; name: string }>>(
+        `${this.apiBase}/field`
+      )
+      const field = fields.find((f) => f.name.toLowerCase() === fieldName.toLowerCase())
+      return field?.id ?? null
+    } catch {
+      return null
+    }
+  }
+
+  async getFieldOptions(fieldName: string, _projectKey?: string): Promise<FieldOption[]> {
+    if (fieldName.toLowerCase() === "severity") {
+      const fieldId = await this.getFieldId("Severity")
+      if (fieldId) {
+        try {
+          const response = await this.request<{ allowedValues: Array<{ id: string; value: string; name?: string }> }>(
+            `${this.apiBase}/issue/createmeta?expand=projects.issuetypes.fields`
+          )
+          if (response.allowedValues) {
+            return response.allowedValues.map((v) => ({ id: v.id, value: v.name || v.value }))
+          }
+        } catch {
+          // Fall through to defaults
+        }
+      }
+      return [
+        { id: "1", value: "1 - Critical" },
+        { id: "2", value: "2 - High" },
+        { id: "3", value: "3 - Medium" },
+        { id: "4", value: "4 - Low" },
+        { id: "5", value: "5 - Trivial" },
+      ]
+    }
+    return []
   }
 }
 

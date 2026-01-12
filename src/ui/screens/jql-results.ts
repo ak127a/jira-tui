@@ -6,6 +6,8 @@ import {
 import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import { createTable, type TableColumn, type TableRow } from "../components/table"
+import { createFieldSelector, type EditableField } from "../components/field-selector"
+import { createBulkEditScreen } from "../components/bulk-edit"
 import { formatDateTime, type JiraIssue } from "../../api"
 
 const JIRA_BLUE = "#0052CC"
@@ -101,7 +103,7 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
 
   const helpText = new TextRenderable(renderer, {
     id: "help",
-    content: "↑/↓/j/k Nav  •  n Next Page  •  p Prev Page  •  Esc Back  •  q Quit",
+    content: "↑/↓ Nav  •  Space Select  •  e Edit  •  n/p Page  •  Esc Back  •  q Quit",
     fg: GRAY,
   })
   statusBar.add(helpText)
@@ -111,6 +113,8 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
   let currentPage = 0
   let totalIssues = 0
   let tableBox: BoxRenderable | null = null
+  const selectedIssueIndices = new Set<number>()
+  let isInBulkEditMode = false
 
   const PAGE_SIZE = 15
 
@@ -126,7 +130,8 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
   function updateStatus() {
     const totalPages = getTotalPages()
     const pageInfo = totalPages > 1 ? ` • Page ${currentPage + 1}/${totalPages}` : ""
-    statusText.content = `Showing ${issues.length} of ${totalIssues} issues${pageInfo}`
+    const selectionInfo = selectedIssueIndices.size > 0 ? ` • ${selectedIssueIndices.size} selected` : ""
+    statusText.content = `Showing ${issues.length} of ${totalIssues} issues${pageInfo}${selectionInfo}`
   }
 
   function renderTable() {
@@ -136,12 +141,22 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
 
     const visibleIssues = getVisibleIssues()
     const rows = visibleIssues.map(issueToRow)
+    const pageStart = currentPage * PAGE_SIZE
+
+    const visibleSelectedRows = new Set<number>()
+    for (const idx of selectedIssueIndices) {
+      const pageIdx = idx - pageStart
+      if (pageIdx >= 0 && pageIdx < PAGE_SIZE) {
+        visibleSelectedRows.add(pageIdx)
+      }
+    }
 
     tableBox = createTable(renderer, contentBox, {
       id: "issues-table",
       columns: COLUMNS,
       rows,
       selectedIndex: selectedIndex % PAGE_SIZE,
+      selectedRows: visibleSelectedRows,
       maxHeight: PAGE_SIZE + 3,
     })
 
@@ -178,14 +193,59 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     contentBox.add(errorText)
   }
 
+  function showFieldSelector() {
+    isInBulkEditMode = true
+    const selectedKeys = Array.from(selectedIssueIndices).map((i) => issues[i].key)
+
+    createFieldSelector(renderer, mainContainer, (result) => {
+      if (result.cancelled || result.selectedFields.length === 0) {
+        isInBulkEditMode = false
+        return
+      }
+
+      showBulkEditScreen(selectedKeys, result.selectedFields)
+    })
+  }
+
+  function showBulkEditScreen(issueKeys: string[], fields: EditableField[]) {
+    if (!client) return
+
+    createBulkEditScreen(renderer, mainContainer, issueKeys, fields, client, (result) => {
+      isInBulkEditMode = false
+      if (result.success) {
+        selectedIssueIndices.clear()
+        renderTable()
+      }
+    })
+  }
+
   const keyHandler = (key: KeyEvent) => {
     if (ctx.currentScreen !== "jql_results") return
+    if (isInBulkEditMode) return
 
     if (key.name === "escape") {
-      ctx.navigate("jql_search")
+      if (selectedIssueIndices.size > 0) {
+        selectedIssueIndices.clear()
+        renderTable()
+      } else {
+        ctx.navigate("jql_search")
+      }
     } else if (key.name === "q") {
       renderer.destroy()
       process.exit(0)
+    } else if (key.name === "space") {
+      if (issues.length > 0) {
+        if (selectedIssueIndices.has(selectedIndex)) {
+          selectedIssueIndices.delete(selectedIndex)
+        } else {
+          selectedIssueIndices.add(selectedIndex)
+        }
+        renderTable()
+      }
+    } else if (key.name === "e") {
+      if (selectedIssueIndices.size > 0) {
+        showFieldSelector()
+      }
     } else if (key.name === "up" || (key.name === "k" && !key.ctrl)) {
       if (selectedIndex > 0) {
         selectedIndex--
