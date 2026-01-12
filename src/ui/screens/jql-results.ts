@@ -29,11 +29,11 @@ function issueToRow(issue: JiraIssue): TableRow {
   }
 }
 
-export async function createIssuesScreen(ctx: AppContext): Promise<void> {
-  const { renderer, client, selectedProject } = ctx
+export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
+  const { renderer, client, jqlQuery } = ctx
 
-  if (!client || !selectedProject) {
-    ctx.navigate("projects")
+  if (!client || !jqlQuery) {
+    ctx.navigate("jql_search")
     return
   }
 
@@ -48,13 +48,21 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
   })
   renderer.root.add(mainContainer)
 
-  createHeader(renderer, mainContainer, `Issues in ${selectedProject}`)
+  createHeader(renderer, mainContainer, "JQL Results")
+
+  const queryDisplay = new TextRenderable(renderer, {
+    id: "query-display",
+    content: `Query: ${jqlQuery.length > 60 ? jqlQuery.slice(0, 57) + "..." : jqlQuery}`,
+    fg: GRAY,
+    marginTop: 1,
+  })
+  mainContainer.add(queryDisplay)
 
   const contentBox = new BoxRenderable(renderer, {
     id: "content-box",
     width: "95%",
     height: "60%",
-    marginTop: 2,
+    marginTop: 1,
     flexDirection: "column",
     backgroundColor: JIRA_DARK,
     border: true,
@@ -141,7 +149,8 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
   }
 
   try {
-    const response = await client.getProjectIssues(selectedProject, {
+    const response = await client.searchIssues({
+      jql: jqlQuery,
       maxResults: 100,
     })
 
@@ -152,7 +161,7 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
     if (issues.length === 0) {
       const noIssues = new TextRenderable(renderer, {
         id: "no-issues",
-        content: "No issues found in this project",
+        content: "No issues found for this query",
         fg: GRAY,
       })
       contentBox.add(noIssues)
@@ -163,17 +172,17 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
     contentBox.remove("loading")
     const errorText = new TextRenderable(renderer, {
       id: "error",
-      content: `Error: ${error instanceof Error ? error.message : "Failed to load issues"}`,
+      content: `Error: ${error instanceof Error ? error.message : "Failed to search issues"}`,
       fg: RED,
     })
     contentBox.add(errorText)
   }
 
   const keyHandler = (key: KeyEvent) => {
-    if (ctx.currentScreen !== "issues") return
+    if (ctx.currentScreen !== "jql_results") return
 
     if (key.name === "escape") {
-      ctx.navigate("main_menu")
+      ctx.navigate("jql_search")
     } else if (key.name === "q") {
       renderer.stop()
       process.exit(0)

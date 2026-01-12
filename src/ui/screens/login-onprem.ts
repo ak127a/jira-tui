@@ -10,6 +10,7 @@ import { promisify } from "util"
 import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import { createJiraClient } from "../../api"
+import { loadCachedCredentials, saveCachedCredentials } from "../../config"
 
 const execAsync = promisify(exec)
 
@@ -22,6 +23,7 @@ const RED = "#f85149"
 
 export function createOnPremLoginScreen(ctx: AppContext): void {
   const { renderer } = ctx
+  const cachedCreds = loadCachedCredentials()
 
   const mainContainer = new BoxRenderable(renderer, {
     id: "main-container",
@@ -76,6 +78,7 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
     placeholder: "https://jira.company.com",
     focusedBackgroundColor: "#1a1a1a",
     marginTop: 1,
+    value: cachedCreds.baseUrl || "",
   })
   loginBox.add(baseUrlInput)
 
@@ -93,6 +96,7 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
     placeholder: "Enter username...",
     focusedBackgroundColor: "#1a1a1a",
     marginTop: 1,
+    value: cachedCreds.username || "",
   })
   loginBox.add(usernameInput)
 
@@ -149,11 +153,14 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
       // Test connection by fetching projects
       await ctx.client.getProjects()
 
+      // Cache credentials for next run
+      saveCachedCredentials({ baseUrl, username })
+
       statusText.fg = GREEN
       statusText.content = "✓ Connected successfully!"
 
       setTimeout(() => {
-        ctx.navigate("projects")
+        ctx.navigate("main_menu")
       }, 500)
     } catch (error) {
       statusText.fg = RED

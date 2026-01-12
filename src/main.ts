@@ -6,8 +6,11 @@ import {
   createLandingScreen,
   createCloudLoginScreen,
   createOnPremLoginScreen,
+  createMainMenuScreen,
   createProjectsScreen,
   createIssuesScreen,
+  createJqlSearchScreen,
+  createJqlResultsScreen,
 } from "./ui/screens"
 
 function clearRoot(ctx: AppContext): void {
@@ -31,11 +34,20 @@ async function navigateTo(ctx: AppContext, screen: AppScreen): Promise<void> {
     case "login_onprem":
       createOnPremLoginScreen(ctx)
       break
+    case "main_menu":
+      createMainMenuScreen(ctx)
+      break
     case "projects":
       await createProjectsScreen(ctx)
       break
     case "issues":
       await createIssuesScreen(ctx)
+      break
+    case "jql_search":
+      createJqlSearchScreen(ctx)
+      break
+    case "jql_results":
+      await createJqlResultsScreen(ctx)
       break
   }
 }
@@ -49,6 +61,7 @@ async function main(): Promise<void> {
     config: createDefaultConfig(),
     client: null as JiraClient | null,
     selectedProject: null,
+    jqlQuery: null,
     navigate: (screen: AppScreen) => {
       navigateTo(ctx, screen)
     },

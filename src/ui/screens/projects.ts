@@ -118,7 +118,7 @@ export async function createProjectsScreen(ctx: AppContext): Promise<void> {
     if (ctx.currentScreen !== "projects") return
 
     if (key.name === "escape") {
-      ctx.navigate("landing")
+      ctx.navigate("main_menu")
     } else if (key.name === "q") {
       renderer.stop()
       process.exit(0)

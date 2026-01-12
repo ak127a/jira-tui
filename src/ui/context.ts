@@ -6,8 +6,11 @@ export type AppScreen =
   | "landing"
   | "login_cloud"
   | "login_onprem"
+  | "main_menu"
   | "projects"
   | "issues"
+  | "jql_search"
+  | "jql_results"
 
 export interface AppContext {
   renderer: CliRenderer
@@ -15,5 +18,6 @@ export interface AppContext {
   config: JiraConfig
   client: JiraClient | null
   selectedProject: string | null
+  jqlQuery: string | null
   navigate: (screen: AppScreen) => void
 }
