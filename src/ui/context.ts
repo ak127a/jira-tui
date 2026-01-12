@@ -1,4 +1,4 @@
-import type { CliRenderer } from "@opentui/core"
+import type { CliRenderer, KeyEvent } from "@opentui/core"
 import type { JiraConfig } from "../config"
 import type { JiraClient } from "../api"
 
@@ -12,6 +12,8 @@ export type AppScreen =
   | "jql_search"
   | "jql_results"
 
+export type KeyHandler = (key: KeyEvent) => void
+
 export interface AppContext {
   renderer: CliRenderer
   currentScreen: AppScreen
@@ -20,4 +22,6 @@ export interface AppContext {
   selectedProject: string | null
   jqlQuery: string | null
   navigate: (screen: AppScreen) => void
+  registerKeyHandler: (handler: KeyHandler) => void
+  clearKeyHandlers: () => void
 }

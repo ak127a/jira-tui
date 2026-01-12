@@ -103,5 +103,5 @@ export function createJqlSearchScreen(ctx: AppContext): void {
     }
   }
 
-  renderer.keyInput.on("keypress", keyHandler)
+  ctx.registerKeyHandler(keyHandler)
 }

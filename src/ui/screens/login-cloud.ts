@@ -179,6 +179,6 @@ export function createCloudLoginScreen(ctx: AppContext): void {
     }
   }
 
-  renderer.keyInput.on("keypress", keyHandler)
+  ctx.registerKeyHandler(keyHandler)
   baseUrlInput.focus()
 }

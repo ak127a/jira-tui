@@ -125,5 +125,5 @@ export async function createProjectsScreen(ctx: AppContext): Promise<void> {
     }
   }
 
-  renderer.keyInput.on("keypress", keyHandler)
+  ctx.registerKeyHandler(keyHandler)
 }

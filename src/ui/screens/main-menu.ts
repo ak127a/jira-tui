@@ -99,5 +99,5 @@ export function createMainMenuScreen(ctx: AppContext): void {
     }
   }
 
-  renderer.keyInput.on("keypress", keyHandler)
+  ctx.registerKeyHandler(keyHandler)
 }

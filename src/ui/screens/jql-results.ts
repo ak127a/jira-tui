@@ -280,5 +280,5 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     }
   }
 
-  renderer.keyInput.on("keypress", keyHandler)
+  ctx.registerKeyHandler(keyHandler)
 }

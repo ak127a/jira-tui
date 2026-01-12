@@ -1,7 +1,7 @@
 import { createCliRenderer, type KeyEvent } from "@opentui/core"
 import { createDefaultConfig } from "./config"
 import type { JiraClient } from "./api"
-import type { AppContext, AppScreen } from "./ui/context"
+import type { AppContext, AppScreen, KeyHandler } from "./ui/context"
 import {
   createLandingScreen,
   createCloudLoginScreen,
@@ -21,6 +21,7 @@ function clearRoot(ctx: AppContext): void {
 }
 
 async function navigateTo(ctx: AppContext, screen: AppScreen): Promise<void> {
+  ctx.clearKeyHandlers()
   ctx.currentScreen = screen
   clearRoot(ctx)
 
@@ -55,6 +56,8 @@ async function navigateTo(ctx: AppContext, screen: AppScreen): Promise<void> {
 async function main(): Promise<void> {
   const renderer = await createCliRenderer()
 
+  const keyHandlers: KeyHandler[] = []
+
   const ctx: AppContext = {
     renderer,
     currentScreen: "landing",
@@ -64,6 +67,16 @@ async function main(): Promise<void> {
     jqlQuery: null,
     navigate: (screen: AppScreen) => {
       navigateTo(ctx, screen)
+    },
+    registerKeyHandler: (handler: KeyHandler) => {
+      keyHandlers.push(handler)
+      renderer.keyInput.on("keypress", handler)
+    },
+    clearKeyHandlers: () => {
+      for (const handler of keyHandlers) {
+        renderer.keyInput.off("keypress", handler)
+      }
+      keyHandlers.length = 0
     },
   }
 
