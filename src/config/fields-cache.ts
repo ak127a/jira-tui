@@ -6,6 +6,8 @@ import type { JiraEditMetaResponse, JiraEditMetaField } from "../api/types"
 export interface CachedEditableField {
   id: string
   name: string
+  schemaType?: string
+  schemaItems?: string
   allowedValues?: Array<{ id?: string; name?: string; value?: string; key?: string }>
 }
 
@@ -59,6 +61,8 @@ export function putEditMeta(key: ProjectIssueTypeKey, editmeta: JiraEditMetaResp
     fields[fid] = {
       id: fid,
       name: f.name,
+      schemaType: f.schema?.type,
+      schemaItems: f.schema?.items,
       allowedValues: f.allowedValues,
     }
   }

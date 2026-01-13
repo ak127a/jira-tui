@@ -19,7 +19,7 @@ const SELECTED_COLOR = "#00d4aa"
 export interface EditableField {
   key: string
   label: string
-  type: "text" | "choice"
+  type: "text" | "choice" | "array-text"
   fieldId?: string
   options?: FieldOption[]
 }
@@ -246,6 +246,8 @@ export function createFieldSelector(
           if (!schema) continue
           if (schema.type === "string") {
             mapped.push({ key: name, label: name, type: "text", fieldId: fid })
+          } else if (schema.type === "array" && schema.items === "string") {
+            mapped.push({ key: name, label: name, type: "array-text", fieldId: fid })
           } else {
             const customKey = schema.custom || ""
             const isSelect =
@@ -263,7 +265,9 @@ export function createFieldSelector(
         logger.debug("Using cached fields", { fieldCount: Object.keys(cached).length })
         for (const [fid, f] of Object.entries(cached)) {
           const options = normalizeAllowedValues(f.allowedValues)
-          if (options.length > 0) {
+          if (f.schemaType === "array" && f.schemaItems === "string") {
+            mapped.push({ key: f.name, label: f.name, type: "array-text", fieldId: fid })
+          } else if (options.length > 0) {
             mapped.push({ key: f.name, label: f.name, type: "choice", fieldId: fid, options })
           } else {
             mapped.push({ key: f.name, label: f.name, type: "text", fieldId: fid })

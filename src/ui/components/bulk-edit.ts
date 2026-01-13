@@ -113,7 +113,7 @@ export async function createBulkEditScreen(
   const fieldsBox = new BoxRenderable(renderer, {
     id: "bulk-edit-fields-box",
     width: "95%",
-    height: "55%",
+    height: "70%",
     marginTop: 1,
     marginLeft: 2,
     flexDirection: "column",
@@ -130,7 +130,7 @@ export async function createBulkEditScreen(
 
   const fieldsTitle = new TextRenderable(renderer, {
     id: "fields-title",
-    content: "Fields to Edit (press Enter or Tab to edit):",
+    content: "Fields to Edit (press Enter or Tab to edit inline):",
     fg: WHITE,
     marginBottom: 1,
   })
@@ -139,33 +139,9 @@ export async function createBulkEditScreen(
   const fieldsContainer = new BoxRenderable(renderer, {
     id: "fields-container",
     width: "100%",
-    height: 10,
     flexDirection: "column",
   })
   fieldsBox.add(fieldsContainer)
-
-  // Edit area (shown when editing a field)
-  const editArea = new BoxRenderable(renderer, {
-    id: "edit-area",
-    width: "100%",
-    height: 4,
-    marginTop: 1,
-    flexDirection: "column",
-    backgroundColor: SELECTED_BG,
-    border: true,
-    borderStyle: "single",
-    borderColor: JIRA_BLUE,
-    paddingLeft: 1,
-    paddingRight: 1,
-  })
-  fieldsBox.add(editArea)
-
-  const editLabel = new TextRenderable(renderer, {
-    id: "edit-label",
-    content: "Select a field and press Enter to edit",
-    fg: GRAY,
-  })
-  editArea.add(editLabel)
 
   // Status bar
   const statusText = new TextRenderable(renderer, {
@@ -219,15 +195,16 @@ export async function createBulkEditScreen(
       const fieldRow = new BoxRenderable(renderer, {
         id: rowId,
         width: "100%",
-        height: 2,
+        height: isEditing ? 3 : 2,
         flexDirection: "row",
         backgroundColor: isCurrent ? SELECTED_BG : "transparent",
         paddingLeft: 1,
+        alignItems: "center",
       })
       fieldsContainer.add(fieldRow)
       fieldRowIds.push(rowId)
 
-      const typeIcon = fv.field.type === "text" ? "✎" : "◆"
+      const typeIcon = fv.field.type === "text" ? "✎" : fv.field.type === "array-text" ? "☰" : "◆"
       const marker = new TextRenderable(renderer, {
         id: `field-marker-${i}`,
         content: isCurrent ? `▸ ${typeIcon} ` : `  ${typeIcon} `,
@@ -240,17 +217,70 @@ export async function createBulkEditScreen(
         id: `field-label-${i}`,
         content: `${fv.field.label}:`,
         fg: isCurrent ? WHITE : GRAY,
-        width: 25,
+        width: 20,
       })
       fieldRow.add(label)
 
-      const displayValue = fv.value || "(not set)"
-      const valueText = new TextRenderable(renderer, {
-        id: `field-value-${i}`,
-        content: displayValue,
-        fg: fv.value ? GREEN : GRAY,
-      })
-      fieldRow.add(valueText)
+      if (isEditing && (fv.field.type === "text" || fv.field.type === "array-text")) {
+        // Inline text input (comma-separated for array-text)
+        const placeholder = fv.field.type === "array-text"
+          ? `Enter ${fv.field.label} (comma-separated)...`
+          : `Enter ${fv.field.label}...`
+        textInput = new InputRenderable(renderer, {
+          id: `field-input-${i}`,
+          width: 45,
+          placeholder,
+          focusedBackgroundColor: "#2d333b",
+          backgroundColor: "#2d333b",
+        })
+        textInput.value = fv.value
+        fieldRow.add(textInput)
+        textInput.focus()
+      } else if (isEditing && fv.field.type === "choice") {
+        // Inline choice selector
+        const options = fv.options ?? []
+        const currentIdx = fv.optionIndex ?? 0
+
+        const leftArrow = new TextRenderable(renderer, {
+          id: `choice-left-${i}`,
+          content: currentIdx > 0 ? "◀ " : "  ",
+          fg: currentIdx > 0 ? JIRA_BLUE : GRAY,
+          width: 3,
+        })
+        fieldRow.add(leftArrow)
+
+        const valueText = new TextRenderable(renderer, {
+          id: `choice-value-${i}`,
+          content: `[ ${options[currentIdx]?.value ?? "(none)"} ]`,
+          fg: GREEN,
+        })
+        fieldRow.add(valueText)
+
+        const rightArrow = new TextRenderable(renderer, {
+          id: `choice-right-${i}`,
+          content: currentIdx < options.length - 1 ? " ▶" : "",
+          fg: currentIdx < options.length - 1 ? JIRA_BLUE : GRAY,
+          marginLeft: 1,
+        })
+        fieldRow.add(rightArrow)
+
+        const counter = new TextRenderable(renderer, {
+          id: `choice-counter-${i}`,
+          content: `  (${currentIdx + 1}/${options.length})`,
+          fg: GRAY,
+          marginLeft: 1,
+        })
+        fieldRow.add(counter)
+      } else {
+        // Display value (not editing)
+        const displayValue = fv.value || "(not set)"
+        const valueText = new TextRenderable(renderer, {
+          id: `field-value-${i}`,
+          content: displayValue,
+          fg: fv.value ? GREEN : GRAY,
+        })
+        fieldRow.add(valueText)
+      }
     }
   }
 
@@ -258,88 +288,17 @@ export async function createBulkEditScreen(
     const fv = fieldValues[currentFieldIndex]
     logger.debug("Opening field editor", { field: fv.field.label, type: fv.field.type })
 
-    // Clear previous edit content
-    editArea.remove("edit-input")
-    editArea.remove("choice-row")
-
-    if (fv.field.type === "text") {
+    if (fv.field.type === "text" || fv.field.type === "array-text") {
       editMode = "edit-text"
-      editLabel.content = `Edit "${fv.field.label}":`
-      editLabel.fg = WHITE
-
-      textInput = new InputRenderable(renderer, {
-        id: "edit-input",
-        width: 50,
-        placeholder: `Enter ${fv.field.label}...`,
-        focusedBackgroundColor: "#2d333b",
-        marginTop: 1,
-      })
-      textInput.value = fv.value
-      editArea.add(textInput)
-      textInput.focus()
     } else {
       editMode = "edit-choice"
-      editLabel.content = `Select "${fv.field.label}":`
-      editLabel.fg = WHITE
-      renderChoiceRow(fv)
     }
 
     updateHelpText()
     renderFields()
   }
 
-  function renderChoiceRow(fv: FieldValue) {
-    editArea.remove("choice-row")
-
-    const options = fv.options ?? []
-    const currentIdx = fv.optionIndex ?? 0
-
-    const choiceRow = new BoxRenderable(renderer, {
-      id: "choice-row",
-      width: "100%",
-      height: 1,
-      flexDirection: "row",
-      marginTop: 1,
-    })
-    editArea.add(choiceRow)
-
-    const leftArrow = new TextRenderable(renderer, {
-      id: "choice-left",
-      content: currentIdx > 0 ? "◀ " : "  ",
-      fg: currentIdx > 0 ? JIRA_BLUE : GRAY,
-      width: 3,
-    })
-    choiceRow.add(leftArrow)
-
-    const valueText = new TextRenderable(renderer, {
-      id: "choice-value",
-      content: `[ ${options[currentIdx]?.value ?? "(none)"} ]`,
-      fg: GREEN,
-    })
-    choiceRow.add(valueText)
-
-    const rightArrow = new TextRenderable(renderer, {
-      id: "choice-right",
-      content: currentIdx < options.length - 1 ? " ▶" : "",
-      fg: currentIdx < options.length - 1 ? JIRA_BLUE : GRAY,
-      marginLeft: 1,
-    })
-    choiceRow.add(rightArrow)
-
-    const counter = new TextRenderable(renderer, {
-      id: "choice-counter",
-      content: `  (${currentIdx + 1}/${options.length})`,
-      fg: GRAY,
-      marginLeft: 1,
-    })
-    choiceRow.add(counter)
-  }
-
   function hideEditArea() {
-    editArea.remove("edit-input")
-    editArea.remove("choice-row")
-    editLabel.content = "Select a field and press Enter to edit"
-    editLabel.fg = GRAY
     if (textInput) {
       textInput.blur()
       textInput = null
@@ -373,6 +332,31 @@ export async function createBulkEditScreen(
     }
   }
 
+  async function handlePaste(): Promise<void> {
+    if (!textInput) return
+    try {
+      // Use platform-specific clipboard command
+      const isWindows = process.platform === "win32"
+      const clipboardCmd = isWindows
+        ? ["powershell", "-command", "Get-Clipboard"]
+        : isMac
+        ? ["pbpaste"]
+        : ["xclip", "-selection", "clipboard", "-o"]
+      
+      const proc = Bun.spawn(clipboardCmd, { stdout: "pipe" })
+      const output = await new Response(proc.stdout).text()
+      const clipboardText = output.trim()
+      
+      if (clipboardText) {
+        // Insert at cursor position (append to current value for simplicity)
+        textInput.value = textInput.value + clipboardText
+        logger.debug("Pasted text", { length: clipboardText.length })
+      }
+    } catch (err) {
+      logger.error("Failed to paste from clipboard", { error: err instanceof Error ? err.message : "Unknown" })
+    }
+  }
+
   async function saveChanges() {
     if (isSaving) {
       logger.debug("Save already in progress, ignoring")
@@ -397,6 +381,13 @@ export async function createBulkEditScreen(
             fieldsToUpdate.summary = fv.value
           } else if (fv.fieldId) {
             fieldsToUpdate[fv.fieldId] = fv.value
+          }
+        }
+      } else if (fv.field.type === "array-text") {
+        if (fv.value && fv.fieldId) {
+          const items = fv.value.split(",").map((s) => s.trim()).filter((s) => s.length > 0)
+          if (items.length > 0) {
+            fieldsToUpdate[fv.fieldId] = items
           }
         }
       } else if (
@@ -498,6 +489,11 @@ export async function createBulkEditScreen(
         moveToNextField()
         return
       }
+      // Handle paste (Ctrl+V on Windows/Linux, Cmd+V on Mac)
+      if ((key.ctrl || key.meta) && key.name === "v") {
+        handlePaste()
+        return
+      }
       // InputRenderable handles typing
       return
     }
@@ -516,7 +512,6 @@ export async function createBulkEditScreen(
         if (currentFv.options && (currentFv.optionIndex ?? 0) > 0) {
           currentFv.optionIndex = (currentFv.optionIndex ?? 0) - 1
           currentFv.value = currentFv.options[currentFv.optionIndex].value
-          renderChoiceRow(currentFv)
           renderFields()
         }
         return
@@ -525,7 +520,6 @@ export async function createBulkEditScreen(
         if (currentFv.options && (currentFv.optionIndex ?? 0) < currentFv.options.length - 1) {
           currentFv.optionIndex = (currentFv.optionIndex ?? 0) + 1
           currentFv.value = currentFv.options[currentFv.optionIndex].value
-          renderChoiceRow(currentFv)
           renderFields()
         }
         return
