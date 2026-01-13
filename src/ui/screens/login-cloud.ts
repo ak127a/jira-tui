@@ -154,7 +154,7 @@ export function createCloudLoginScreen(ctx: AppContext): void {
 
       ctx.client = createJiraClient(ctx.config)
 
-      await ctx.client.getProjects()
+      await ctx.client.validateConnection()
 
       statusText.fg = GREEN
       statusText.content = "✓ Connected successfully!"

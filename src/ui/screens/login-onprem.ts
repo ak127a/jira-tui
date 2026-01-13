@@ -154,7 +154,7 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
       ctx.client = createJiraClient(ctx.config)
 
       logger.info("onprem_login_attempt", { baseUrl, username })
-      await ctx.client.getProjects()
+      await ctx.client.validateConnection()
 
       saveCachedCredentials({ baseUrl, username })
 

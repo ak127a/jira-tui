@@ -18,6 +18,7 @@ export interface JiraClient {
   readonly config: JiraConfig
   readonly isCloud: boolean
 
+  validateConnection(): Promise<void>
   getProjects(): Promise<JiraProject[]>
   searchIssues(options: SearchOptions): Promise<JiraSearchResponse>
   getProjectIssues(projectKey: string, options?: Omit<SearchOptions, "jql">): Promise<JiraSearchResponse>
@@ -97,6 +98,7 @@ abstract class BaseJiraClient implements JiraClient {
     }
   }
 
+  abstract validateConnection(): Promise<void>
   abstract getProjects(): Promise<JiraProject[]>
   abstract searchIssues(options: SearchOptions): Promise<JiraSearchResponse>
   abstract updateIssue(issueKey: string, fields: Record<string, unknown>): Promise<void>
@@ -123,6 +125,11 @@ class CloudJiraClient extends BaseJiraClient {
 
   private get apiBase(): string {
     return `/rest/api/${this.apiVersion}`
+  }
+
+  async validateConnection(): Promise<void> {
+    logger.info("Validating connection (cloud)")
+    await this.request<unknown>(`${this.apiBase}/myself`)
   }
 
   async getProjects(): Promise<JiraProject[]> {
@@ -206,6 +213,11 @@ class CloudJiraClient extends BaseJiraClient {
 
   private get apiBase(): string {
     return `/rest/api/${this.apiVersion}`
+  }
+
+  async validateConnection(): Promise<void> {
+    logger.info("Validating connection (onprem)")
+    await this.request<unknown>(`${this.apiBase}/myself`)
   }
 
   async getProjects(): Promise<JiraProject[]> {
