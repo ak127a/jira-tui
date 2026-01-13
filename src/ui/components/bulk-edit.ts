@@ -7,6 +7,7 @@ import {
 } from "@opentui/core"
 import type { JiraClient, FieldOption } from "../../api"
 import type { EditableField } from "./field-selector"
+import { logger } from "../../logging/logger"
 
 const WHITE = "#FFFFFF"
 const GRAY = "#7A869A"
@@ -35,6 +36,7 @@ type EditMode = "navigate" | "edit-text" | "edit-choice"
 
 const isMac = process.platform === "darwin"
 const pasteHint = isMac ? "⌘V Paste" : "Ctrl+V Paste"
+const saveHint = isMac ? "⌘S Save" : "Ctrl+S Save"
 
 export async function createBulkEditScreen(
   renderer: CliRenderer,
@@ -44,25 +46,32 @@ export async function createBulkEditScreen(
   client: JiraClient,
   onComplete: (result: BulkEditResult) => void
 ): Promise<{ destroy: () => void }> {
+  logger.info("Opening bulk edit screen", { issueCount: issueKeys.length, fieldCount: fields.length, issueKeys })
+
   let currentFieldIndex = 0
   let editMode: EditMode = "navigate"
   const fieldValues: FieldValue[] = []
   let fieldRowIds: string[] = []
   let textInput: InputRenderable | null = null
+  let isSaving = false
 
   for (const field of fields) {
-    const fv: FieldValue = { field, value: "" }
+    const fv: FieldValue = { field, value: "", fieldId: field.fieldId }
     if (field.type === "choice") {
       const options = field.options ?? []
       fv.options = options
       fv.optionIndex = options.length > 0 ? 0 : undefined
       fv.value = options[0]?.value ?? ""
-      fv.fieldId = field.fieldId
     }
     fieldValues.push(fv)
   }
 
-  // Full screen container - replaces the entire view
+  // Remove the parent container from root to clear the screen
+  renderer.root.remove("main-container")
+  // Also remove field-selector if it exists
+  renderer.root.remove("field-selector-container")
+
+  // Full screen container
   const mainContainer = new BoxRenderable(renderer, {
     id: "bulk-edit-main",
     width: "100%",
@@ -104,7 +113,7 @@ export async function createBulkEditScreen(
   const fieldsBox = new BoxRenderable(renderer, {
     id: "bulk-edit-fields-box",
     width: "95%",
-    height: "60%",
+    height: "55%",
     marginTop: 1,
     marginLeft: 2,
     flexDirection: "column",
@@ -121,7 +130,7 @@ export async function createBulkEditScreen(
 
   const fieldsTitle = new TextRenderable(renderer, {
     id: "fields-title",
-    content: "Fields to Edit:",
+    content: "Fields to Edit (press Enter or Tab to edit):",
     fg: WHITE,
     marginBottom: 1,
   })
@@ -130,7 +139,7 @@ export async function createBulkEditScreen(
   const fieldsContainer = new BoxRenderable(renderer, {
     id: "fields-container",
     width: "100%",
-    height: 12,
+    height: 10,
     flexDirection: "column",
   })
   fieldsBox.add(fieldsContainer)
@@ -153,8 +162,8 @@ export async function createBulkEditScreen(
 
   const editLabel = new TextRenderable(renderer, {
     id: "edit-label",
-    content: "",
-    fg: WHITE,
+    content: "Select a field and press Enter to edit",
+    fg: GRAY,
   })
   editArea.add(editLabel)
 
@@ -187,7 +196,7 @@ export async function createBulkEditScreen(
 
   function updateHelpText() {
     if (editMode === "navigate") {
-      helpText.content = "↑↓/jk Navigate  •  Tab/Enter Edit  •  Ctrl+S Save  •  Esc Cancel"
+      helpText.content = `↑↓/jk Navigate  •  Tab/Enter Edit  •  ${saveHint}  •  Esc Cancel`
     } else if (editMode === "edit-text") {
       helpText.content = `Type to edit  •  ${pasteHint}  •  Enter/Tab Next  •  Esc Cancel Edit`
     } else if (editMode === "edit-choice") {
@@ -247,6 +256,7 @@ export async function createBulkEditScreen(
 
   function showEditArea() {
     const fv = fieldValues[currentFieldIndex]
+    logger.debug("Opening field editor", { field: fv.field.label, type: fv.field.type })
 
     // Clear previous edit content
     editArea.remove("edit-input")
@@ -255,6 +265,7 @@ export async function createBulkEditScreen(
     if (fv.field.type === "text") {
       editMode = "edit-text"
       editLabel.content = `Edit "${fv.field.label}":`
+      editLabel.fg = WHITE
 
       textInput = new InputRenderable(renderer, {
         id: "edit-input",
@@ -269,6 +280,7 @@ export async function createBulkEditScreen(
     } else {
       editMode = "edit-choice"
       editLabel.content = `Select "${fv.field.label}":`
+      editLabel.fg = WHITE
       renderChoiceRow(fv)
     }
 
@@ -326,7 +338,8 @@ export async function createBulkEditScreen(
   function hideEditArea() {
     editArea.remove("edit-input")
     editArea.remove("choice-row")
-    editLabel.content = ""
+    editLabel.content = "Select a field and press Enter to edit"
+    editLabel.fg = GRAY
     if (textInput) {
       textInput.blur()
       textInput = null
@@ -340,6 +353,7 @@ export async function createBulkEditScreen(
     const fv = fieldValues[currentFieldIndex]
     if (editMode === "edit-text" && textInput) {
       fv.value = textInput.value
+      logger.debug("Field value updated", { field: fv.field.label, value: fv.value })
     }
     hideEditArea()
   }
@@ -348,6 +362,7 @@ export async function createBulkEditScreen(
     const fv = fieldValues[currentFieldIndex]
     if (editMode === "edit-text" && textInput) {
       fv.value = textInput.value
+      logger.debug("Field value updated", { field: fv.field.label, value: fv.value })
     }
 
     if (currentFieldIndex < fieldValues.length - 1) {
@@ -359,21 +374,30 @@ export async function createBulkEditScreen(
   }
 
   async function saveChanges() {
+    if (isSaving) {
+      logger.debug("Save already in progress, ignoring")
+      return
+    }
+
+    logger.info("Starting bulk save", { issueCount: issueKeys.length })
+
     if (editMode !== "navigate") {
       confirmCurrentEdit()
     }
 
-    let isSaving = true
+    isSaving = true
     helpText.content = "Saving in progress..."
 
     // Collect fields to update
     const fieldsToUpdate: Record<string, unknown> = {}
     for (const fv of fieldValues) {
       if (fv.field.type === "text") {
-        if (fv.field.key === "summary" && fv.value) {
-          fieldsToUpdate.summary = fv.value
-        } else if (fv.fieldId && fv.value) {
-          fieldsToUpdate[fv.fieldId] = fv.value
+        if (fv.value) {
+          if (fv.field.key.toLowerCase() === "summary") {
+            fieldsToUpdate.summary = fv.value
+          } else if (fv.fieldId) {
+            fieldsToUpdate[fv.fieldId] = fv.value
+          }
         }
       } else if (
         fv.field.type === "choice" &&
@@ -388,10 +412,14 @@ export async function createBulkEditScreen(
       }
     }
 
+    logger.info("Fields to update", { fieldsToUpdate })
+
     if (Object.keys(fieldsToUpdate).length === 0) {
-      statusText.content = "⚠ No changes to save"
+      statusText.content = "⚠ No changes to save - edit some fields first"
       statusText.fg = YELLOW
+      isSaving = false
       updateHelpText()
+      logger.warn("No fields to update")
       return
     }
 
@@ -409,11 +437,13 @@ export async function createBulkEditScreen(
 
     try {
       for (const issueKey of issueKeys) {
-        statusText.content = `⠋ Saving ${issueKey}... (${savedCount + 1}/${issueKeys.length})`
+        statusText.content = `⠋ Updating ${issueKey}... (${savedCount + 1}/${issueKeys.length})`
         statusText.fg = JIRA_BLUE
+        logger.info("Updating issue", { issueKey, fields: fieldsToUpdate })
 
         await client.updateIssue(issueKey, fieldsToUpdate)
         savedCount++
+        logger.info("Issue updated successfully", { issueKey, savedCount, total: issueKeys.length })
       }
 
       isSaving = false
@@ -421,12 +451,13 @@ export async function createBulkEditScreen(
 
       statusText.content = `✓ Successfully updated ${issueKeys.length} issue${issueKeys.length > 1 ? "s" : ""}!`
       statusText.fg = GREEN
-      helpText.content = "Closing..."
+      helpText.content = "Closing in 2 seconds..."
+      logger.info("Bulk update completed successfully", { issueCount: issueKeys.length })
 
       setTimeout(() => {
         cleanup()
         onComplete({ success: true, cancelled: false })
-      }, 1500)
+      }, 2000)
     } catch (error) {
       isSaving = false
       clearInterval(spinnerInterval)
@@ -434,20 +465,25 @@ export async function createBulkEditScreen(
       const errorMsg = error instanceof Error ? error.message : "Unknown error"
       statusText.content = `✗ Failed after ${savedCount}/${issueKeys.length}: ${errorMsg}`
       statusText.fg = RED
-      helpText.content = "Esc to go back  •  Ctrl+S to retry"
+      helpText.content = `Esc to go back  •  ${saveHint} to retry`
+      logger.error("Bulk update failed", { savedCount, total: issueKeys.length, error: errorMsg })
     }
   }
 
   function cleanup() {
+    logger.debug("Cleaning up bulk edit screen")
     renderer.keyInput.off("keypress", keyHandler)
     renderer.root.remove("bulk-edit-main")
   }
 
-  const keyHandler = (key: KeyEvent) => {
+  function keyHandler(key: KeyEvent) {
+    logger.debug("Key pressed in bulk-edit", { name: key.name, ctrl: key.ctrl, meta: key.meta, sequence: key.sequence })
+
     const currentFv = fieldValues[currentFieldIndex]
 
-    // Global save shortcut
-    if (key.ctrl && key.name === "s") {
+    // Global save shortcut - check for both ctrl and meta (cmd on mac)
+    if ((key.ctrl || key.meta) && key.name === "s") {
+      logger.info("Save shortcut triggered")
       saveChanges()
       return
     }
@@ -499,6 +535,7 @@ export async function createBulkEditScreen(
 
     // Navigate mode
     if (key.name === "escape") {
+      logger.info("Bulk edit cancelled by user")
       cleanup()
       onComplete({ success: false, cancelled: true })
       return
@@ -527,6 +564,7 @@ export async function createBulkEditScreen(
   }
 
   renderer.keyInput.on("keypress", keyHandler)
+  logger.debug("Key handler registered for bulk-edit")
 
   // Initial render
   updateHelpText()

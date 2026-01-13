@@ -4,14 +4,16 @@ import {
   type CliRenderer,
   type KeyEvent,
 } from "@opentui/core"
-import type { JiraClient, JiraField, FieldOption } from "../../api"
+import type { JiraClient, FieldOption } from "../../api"
 import type { ProjectIssueTypeKey } from "../../config/fields-cache"
 import { getFields as getCachedFields, putEditMeta } from "../../config/fields-cache"
+import { logger } from "../../logging/logger"
 
 const WHITE = "#FFFFFF"
 const GRAY = "#7A869A"
-const DARK_BG = "#1a1a1a"
+const DARK_BG = "#0D1117"
 const JIRA_BLUE = "#0052CC"
+const JIRA_DARK = "#172B4D"
 const SELECTED_COLOR = "#00d4aa"
 
 export interface EditableField {
@@ -27,34 +29,6 @@ export interface FieldSelectorResult {
   cancelled: boolean
 }
 
-function mapFieldToEditable(field: JiraField): EditableField | null {
-  const name = field.name
-  const schema = field.schema
-  if (!schema) return null
-
-  const customKey = schema.custom || ""
-  const type = schema.type || ""
-
-  // Text-like fields
-  if (type === "string") {
-    return { key: name, label: name, type: "text" }
-  }
-
-  // Common choice-like custom field types
-  const isSelect =
-    customKey.includes(":select") ||
-    customKey.includes(":multiselect") ||
-    customKey.includes(":radiobuttons") ||
-    customKey.includes(":multicheckboxes") ||
-    customKey.includes(":cascadingselect")
-
-  if (isSelect) {
-    return { key: name, label: name, type: "choice" }
-  }
-
-  return null
-}
-
 export interface FieldSelectorSeed {
   issueKey: string
   projectKey: string
@@ -63,11 +37,13 @@ export interface FieldSelectorSeed {
 
 export function createFieldSelector(
   renderer: CliRenderer,
-  parent: BoxRenderable,
+  _parent: BoxRenderable,
   client: JiraClient,
   seed: FieldSelectorSeed,
   onComplete: (result: FieldSelectorResult) => void
 ): { destroy: () => void } {
+  logger.info("Opening field selector", { seed })
+
   let searchText = ""
   let cursorIndex = 0
   const selectedFields = new Set<string>()
@@ -78,12 +54,46 @@ export function createFieldSelector(
     { key: "summary", label: "Summary", type: "text" },
   ]
 
-  const container = new BoxRenderable(renderer, {
-    id: "field-selector-container",
-    width: "90%",
-    height: "80%",
-    flexDirection: "row",
+  // Remove the parent container (jql results) to show full screen
+  renderer.root.remove("main-container")
+
+  // Full screen container
+  const mainContainer = new BoxRenderable(renderer, {
+    id: "field-selector-main",
+    width: "100%",
+    height: "100%",
+    flexDirection: "column",
     backgroundColor: DARK_BG,
+  })
+  renderer.root.add(mainContainer)
+
+  // Header
+  const headerBox = new BoxRenderable(renderer, {
+    id: "field-selector-header",
+    width: "100%",
+    height: 3,
+    backgroundColor: JIRA_BLUE,
+    alignItems: "center",
+    justifyContent: "center",
+  })
+  mainContainer.add(headerBox)
+
+  const headerText = new TextRenderable(renderer, {
+    id: "field-selector-header-text",
+    content: "Select Fields to Edit",
+    fg: WHITE,
+  })
+  headerBox.add(headerText)
+
+  // Content area
+  const contentBox = new BoxRenderable(renderer, {
+    id: "field-selector-content",
+    width: "95%",
+    height: "70%",
+    marginTop: 1,
+    marginLeft: 2,
+    flexDirection: "row",
+    backgroundColor: JIRA_DARK,
     border: true,
     borderStyle: "rounded",
     borderColor: JIRA_BLUE,
@@ -92,15 +102,16 @@ export function createFieldSelector(
     paddingLeft: 2,
     paddingRight: 2,
   })
-  parent.add(container)
+  mainContainer.add(contentBox)
 
+  // Left panel - available fields
   const leftPanel = new BoxRenderable(renderer, {
     id: "left-panel",
     width: "50%",
     height: "100%",
     flexDirection: "column",
   })
-  container.add(leftPanel)
+  contentBox.add(leftPanel)
 
   const searchLabel = new TextRenderable(renderer, {
     id: "search-label",
@@ -120,14 +131,14 @@ export function createFieldSelector(
 
   const searchInput = new TextRenderable(renderer, {
     id: "search-input",
-    content: "",
+    content: "_",
     fg: WHITE,
   })
   searchBox.add(searchInput)
 
   const fieldListLabel = new TextRenderable(renderer, {
     id: "field-list-label",
-    content: "Available Fields (Space to select):",
+    content: "Available Fields:",
     fg: GRAY,
     marginTop: 1,
   })
@@ -136,12 +147,13 @@ export function createFieldSelector(
   const fieldListBox = new BoxRenderable(renderer, {
     id: "field-list-box",
     width: "90%",
-    height: 10,
+    height: 12,
     flexDirection: "column",
     marginTop: 1,
   })
   leftPanel.add(fieldListBox)
 
+  // Right panel - selected fields
   const rightPanel = new BoxRenderable(renderer, {
     id: "right-panel",
     width: "45%",
@@ -149,7 +161,7 @@ export function createFieldSelector(
     flexDirection: "column",
     marginLeft: 2,
   })
-  container.add(rightPanel)
+  contentBox.add(rightPanel)
 
   const selectedLabel = new TextRenderable(renderer, {
     id: "selected-label",
@@ -161,7 +173,7 @@ export function createFieldSelector(
   const selectedListBox = new BoxRenderable(renderer, {
     id: "selected-list-box",
     width: "90%",
-    height: 10,
+    height: 12,
     flexDirection: "column",
     marginTop: 1,
     backgroundColor: "#22272e",
@@ -172,13 +184,32 @@ export function createFieldSelector(
   })
   rightPanel.add(selectedListBox)
 
-  const helpText = new TextRenderable(renderer, {
-    id: "selector-help",
-    content: "Enter: Confirm  •  Esc: Cancel  •  Space: Toggle",
-    fg: GRAY,
-    marginTop: 2,
+  // Help bar
+  const helpBox = new BoxRenderable(renderer, {
+    id: "field-selector-help-box",
+    width: "100%",
+    height: 1,
+    marginTop: 1,
+    marginLeft: 2,
   })
-  leftPanel.add(helpText)
+  mainContainer.add(helpBox)
+
+  const helpText = new TextRenderable(renderer, {
+    id: "field-selector-help",
+    content: "↑↓/jk Navigate  •  Space Select  •  Enter Confirm  •  Esc Cancel",
+    fg: GRAY,
+  })
+  helpBox.add(helpText)
+
+  // Loading indicator
+  const statusText = new TextRenderable(renderer, {
+    id: "field-selector-status",
+    content: "Loading fields...",
+    fg: GRAY,
+    marginTop: 1,
+    marginLeft: 2,
+  })
+  mainContainer.add(statusText)
 
   function normalizeAllowedValues(values: Array<{ id?: string; name?: string; value?: string; key?: string }> | undefined): FieldOption[] {
     if (!values) return []
@@ -197,13 +228,18 @@ export function createFieldSelector(
         projectKey: seed.projectKey,
         issueType: seed.issueType,
       }
-      let editmeta: import("../../api").JiraEditMetaResponse | null = null
+
+      logger.debug("Loading fields for", { key })
+
       const cached = getCachedFields(key)
       const mapped: EditableField[] = []
 
       if (!cached) {
-        editmeta = await client.getIssueEditMeta(seed.issueKey)
+        logger.info("Fetching edit meta from API", { issueKey: seed.issueKey })
+        const editmeta = await client.getIssueEditMeta(seed.issueKey)
         putEditMeta(key, editmeta)
+        logger.info("Edit meta received", { fieldCount: Object.keys(editmeta.fields).length })
+
         for (const [fid, f] of Object.entries(editmeta.fields)) {
           const schema = f.schema
           const name = f.name
@@ -224,6 +260,7 @@ export function createFieldSelector(
           }
         }
       } else {
+        logger.debug("Using cached fields", { fieldCount: Object.keys(cached).length })
         for (const [fid, f] of Object.entries(cached)) {
           const options = normalizeAllowedValues(f.allowedValues)
           if (options.length > 0) {
@@ -234,13 +271,18 @@ export function createFieldSelector(
         }
       }
 
-      const hasSummary = mapped.some((m) => m.key.toLowerCase() === "summary")
       AVAILABLE_FIELDS = [
         { key: "summary", label: "Summary", type: "text" },
         ...mapped.filter((m) => m.key.toLowerCase() !== "summary"),
       ]
+
+      statusText.content = `${AVAILABLE_FIELDS.length} fields available`
+      statusText.fg = SELECTED_COLOR
       render()
     } catch (err) {
+      logger.error("Failed to load fields", { error: err instanceof Error ? err.message : String(err) })
+      statusText.content = `Error loading fields: ${err instanceof Error ? err.message : "Unknown error"}`
+      statusText.fg = "#f85149"
       render()
     }
   }
@@ -261,7 +303,11 @@ export function createFieldSelector(
     fieldListChildIds = []
 
     const filtered = getFilteredFields()
-    for (let i = 0; i < filtered.length; i++) {
+    const maxVisible = 10
+    const startIdx = Math.max(0, cursorIndex - maxVisible + 1)
+    const endIdx = Math.min(filtered.length, startIdx + maxVisible)
+
+    for (let i = startIdx; i < endIdx; i++) {
       const field = filtered[i]
       const isSelected = selectedFields.has(field.key)
       const isCursor = i === cursorIndex
@@ -277,11 +323,12 @@ export function createFieldSelector(
       fieldListBox.add(fieldRow)
       fieldListChildIds.push(rowId)
 
+      const typeIcon = field.type === "text" ? "✎" : "◆"
       const marker = new TextRenderable(renderer, {
         id: `field-marker-${i}`,
-        content: isSelected ? "◆ " : "  ",
-        fg: SELECTED_COLOR,
-        width: 3,
+        content: isSelected ? `✓ ${typeIcon} ` : `  ${typeIcon} `,
+        fg: isSelected ? SELECTED_COLOR : GRAY,
+        width: 5,
       })
       fieldRow.add(marker)
 
@@ -291,6 +338,13 @@ export function createFieldSelector(
         fg: isCursor ? WHITE : isSelected ? SELECTED_COLOR : GRAY,
       })
       fieldRow.add(label)
+    }
+
+    // Show scroll indicator if needed
+    if (filtered.length > maxVisible) {
+      fieldListLabel.content = `Available Fields (${cursorIndex + 1}/${filtered.length}):`
+    } else {
+      fieldListLabel.content = "Available Fields:"
     }
   }
 
@@ -305,7 +359,7 @@ export function createFieldSelector(
       const emptyId = "selected-empty"
       const empty = new TextRenderable(renderer, {
         id: emptyId,
-        content: "(none)",
+        content: "(none selected)",
         fg: GRAY,
       })
       selectedListBox.add(empty)
@@ -313,16 +367,19 @@ export function createFieldSelector(
     } else {
       for (let i = 0; i < selected.length; i++) {
         const field = selected[i]
+        const typeIcon = field.type === "text" ? "✎" : "◆"
         const itemId = `selected-item-${i}`
         const item = new TextRenderable(renderer, {
           id: itemId,
-          content: `• ${field.label}`,
+          content: `${typeIcon} ${field.label}`,
           fg: SELECTED_COLOR,
         })
         selectedListBox.add(item)
         selectedListChildIds.push(itemId)
       }
     }
+
+    selectedLabel.content = `Selected Fields (${selected.length}):`
   }
 
   function updateSearchDisplay() {
@@ -335,25 +392,33 @@ export function createFieldSelector(
     renderSelectedList()
   }
 
-  // initial render with default fields
+  function cleanup() {
+    logger.debug("Cleaning up field selector")
+    renderer.keyInput.off("keypress", keyHandler)
+    renderer.root.remove("field-selector-main")
+  }
+
+  // Initial render
   render()
-  // load dynamic fields asynchronously
+  // Load dynamic fields asynchronously
   void loadFields()
 
-  const keyHandler = (key: KeyEvent) => {
+  function keyHandler(key: KeyEvent) {
+    logger.debug("Key pressed in field-selector", { name: key.name, ctrl: key.ctrl })
+
     const filtered = getFilteredFields()
 
     if (key.name === "escape") {
-      renderer.keyInput.off("keypress", keyHandler)
-      parent.remove("field-selector-container")
+      logger.info("Field selector cancelled")
+      cleanup()
       onComplete({ selectedFields: [], cancelled: true })
       return
     }
 
     if (key.name === "return") {
-      renderer.keyInput.off("keypress", keyHandler)
-      parent.remove("field-selector-container")
       const selected = AVAILABLE_FIELDS.filter((f) => selectedFields.has(f.key))
+      logger.info("Field selector confirmed", { selectedCount: selected.length, fields: selected.map(f => f.label) })
+      cleanup()
       onComplete({ selectedFields: selected, cancelled: false })
       return
     }
@@ -404,11 +469,9 @@ export function createFieldSelector(
   }
 
   renderer.keyInput.on("keypress", keyHandler)
+  logger.debug("Key handler registered for field-selector")
 
   return {
-    destroy: () => {
-      renderer.keyInput.off("keypress", keyHandler)
-      parent.remove("field-selector-container")
-    },
+    destroy: cleanup,
   }
 }

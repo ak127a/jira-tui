@@ -194,6 +194,11 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     contentBox.add(errorText)
   }
 
+  function restoreScreen() {
+    // Re-add the main container to restore the JQL results view
+    renderer.root.add(mainContainer)
+  }
+
   function showFieldSelector() {
     isInBulkEditMode = true
     const selectedKeys = Array.from(selectedIssueIndices).map((i) => issues[i].key)
@@ -214,6 +219,7 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     createFieldSelector(renderer, mainContainer, client, seed, (result) => {
       if (result.cancelled || result.selectedFields.length === 0) {
         isInBulkEditMode = false
+        restoreScreen()
         return
       }
 
@@ -226,12 +232,14 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
 
     createBulkEditScreen(renderer, mainContainer, issueKeys, fields, client, (result) => {
       isInBulkEditMode = false
+      restoreScreen()
       if (result.success) {
         selectedIssueIndices.clear()
         renderTable()
       }
     }).catch(() => {
       isInBulkEditMode = false
+      restoreScreen()
     })
   }
 
