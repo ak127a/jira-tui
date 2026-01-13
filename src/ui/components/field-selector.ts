@@ -244,9 +244,11 @@ export function createFieldSelector(
           const schema = f.schema
           const name = f.name
           if (!schema) continue
+          // Normalize schema.items which can be string or { type: string }
+          const schemaItems = typeof schema.items === "string" ? schema.items : schema.items?.type
           if (schema.type === "string") {
             mapped.push({ key: name, label: name, type: "text", fieldId: fid })
-          } else if (schema.type === "array" && schema.items === "string") {
+          } else if (schema.type === "array" && schemaItems === "string") {
             mapped.push({ key: name, label: name, type: "array-text", fieldId: fid })
           } else {
             const customKey = schema.custom || ""

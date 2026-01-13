@@ -29,9 +29,10 @@ export interface JiraProject {
 
 export interface JiraFieldSchema {
   type?: string
-  items?: string
+  items?: string | { type?: string }
   custom?: string
   customId?: number
+  system?: string
 }
 
 export interface JiraField {

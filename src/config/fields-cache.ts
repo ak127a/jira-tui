@@ -53,6 +53,12 @@ export function makeKey(k: ProjectIssueTypeKey): string {
   return `${k.baseUrl}|${k.mode}|${k.projectKey}|${k.issueType}`
 }
 
+function normalizeSchemaItems(items: string | { type?: string } | undefined): string | undefined {
+  if (!items) return undefined
+  if (typeof items === "string") return items
+  return items.type
+}
+
 export function putEditMeta(key: ProjectIssueTypeKey, editmeta: JiraEditMetaResponse): void {
   const data = loadRaw()
   const k = makeKey(key)
@@ -62,7 +68,7 @@ export function putEditMeta(key: ProjectIssueTypeKey, editmeta: JiraEditMetaResp
       id: fid,
       name: f.name,
       schemaType: f.schema?.type,
-      schemaItems: f.schema?.items,
+      schemaItems: normalizeSchemaItems(f.schema?.items),
       allowedValues: f.allowedValues,
     }
   }
