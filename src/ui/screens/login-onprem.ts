@@ -11,6 +11,7 @@ import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import { createJiraClient } from "../../api"
 import { loadCachedCredentials, saveCachedCredentials } from "../../config"
+import { logger } from "../../logging/logger"
 
 const execAsync = promisify(exec)
 
@@ -132,12 +133,14 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
     statusText.content = "Generating password..."
 
     try {
+      logger.info("onprem_password_generate")
       const { stdout } = await execAsync("COMMAND_FOR_PASSWORD_GEN")
       const password = stdout.trim()
 
       if (!password) {
         statusText.fg = RED
         statusText.content = "Password generation failed!"
+        logger.error("onprem_password_generate_failed")
         return
       }
 
@@ -150,21 +153,23 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
 
       ctx.client = createJiraClient(ctx.config)
 
-      // Test connection by fetching projects
+      logger.info("onprem_login_attempt", { baseUrl, username })
       await ctx.client.getProjects()
 
-      // Cache credentials for next run
       saveCachedCredentials({ baseUrl, username })
 
       statusText.fg = GREEN
       statusText.content = "✓ Connected successfully!"
+      logger.info("onprem_login_success", { baseUrl, username })
 
       setTimeout(() => {
         ctx.navigate("main_menu")
       }, 500)
     } catch (error) {
       statusText.fg = RED
-      statusText.content = `Error: ${error instanceof Error ? error.message : "Connection failed"}`
+      const errMsg = error instanceof Error ? error.message : "Connection failed"
+      statusText.content = `Error: ${errMsg}`
+      logger.error("onprem_login_failure", { baseUrl, username, error: errMsg })
     }
   }
 

@@ -12,6 +12,7 @@ import {
   createJqlSearchScreen,
   createJqlResultsScreen,
 } from "./ui/screens"
+import { logger } from "./logging/logger"
 
 function clearRoot(ctx: AppContext): void {
   const children = ctx.renderer.root.getChildren()
@@ -21,6 +22,7 @@ function clearRoot(ctx: AppContext): void {
 }
 
 async function navigateTo(ctx: AppContext, screen: AppScreen): Promise<void> {
+  logger.info("navigate", { from: ctx.currentScreen, to: screen })
   ctx.clearKeyHandlers()
   ctx.currentScreen = screen
   clearRoot(ctx)
@@ -54,7 +56,9 @@ async function navigateTo(ctx: AppContext, screen: AppScreen): Promise<void> {
 }
 
 async function main(): Promise<void> {
+  logger.info("app_start")
   const renderer = await createCliRenderer()
+  logger.info("renderer_created")
 
   const keyHandlers: KeyHandler[] = []
 
@@ -70,18 +74,21 @@ async function main(): Promise<void> {
     },
     registerKeyHandler: (handler: KeyHandler) => {
       keyHandlers.push(handler)
+      logger.debug("key_handler_registered", { count: keyHandlers.length })
       renderer.keyInput.on("keypress", handler)
     },
     clearKeyHandlers: () => {
       for (const handler of keyHandlers) {
         renderer.keyInput.off("keypress", handler)
       }
+      logger.debug("key_handlers_cleared", { count: keyHandlers.length })
       keyHandlers.length = 0
     },
   }
 
   renderer.keyInput.on("keypress", (key: KeyEvent) => {
     if (key.name === "q" && ctx.currentScreen === "landing") {
+      logger.info("app_exit", { reason: "quit_on_landing" })
       renderer.destroy()
       process.exit(0)
     }
@@ -92,6 +99,7 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
+  logger.error("fatal_error", { error: err instanceof Error ? err.message : String(err) })
   console.error("Fatal error:", err)
   process.exit(1)
 })

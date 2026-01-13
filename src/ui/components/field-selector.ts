@@ -4,6 +4,9 @@ import {
   type CliRenderer,
   type KeyEvent,
 } from "@opentui/core"
+import type { JiraClient, JiraField, FieldOption } from "../../api"
+import type { ProjectIssueTypeKey } from "../../config/fields-cache"
+import { getFields as getCachedFields, putEditMeta } from "../../config/fields-cache"
 
 const WHITE = "#FFFFFF"
 const GRAY = "#7A869A"
@@ -15,6 +18,8 @@ export interface EditableField {
   key: string
   label: string
   type: "text" | "choice"
+  fieldId?: string
+  options?: FieldOption[]
 }
 
 export interface FieldSelectorResult {
@@ -22,14 +27,45 @@ export interface FieldSelectorResult {
   cancelled: boolean
 }
 
-const AVAILABLE_FIELDS: EditableField[] = [
-  { key: "summary", label: "Summary", type: "text" },
-  { key: "severity", label: "Severity", type: "choice" },
-]
+function mapFieldToEditable(field: JiraField): EditableField | null {
+  const name = field.name
+  const schema = field.schema
+  if (!schema) return null
+
+  const customKey = schema.custom || ""
+  const type = schema.type || ""
+
+  // Text-like fields
+  if (type === "string") {
+    return { key: name, label: name, type: "text" }
+  }
+
+  // Common choice-like custom field types
+  const isSelect =
+    customKey.includes(":select") ||
+    customKey.includes(":multiselect") ||
+    customKey.includes(":radiobuttons") ||
+    customKey.includes(":multicheckboxes") ||
+    customKey.includes(":cascadingselect")
+
+  if (isSelect) {
+    return { key: name, label: name, type: "choice" }
+  }
+
+  return null
+}
+
+export interface FieldSelectorSeed {
+  issueKey: string
+  projectKey: string
+  issueType: string
+}
 
 export function createFieldSelector(
   renderer: CliRenderer,
   parent: BoxRenderable,
+  client: JiraClient,
+  seed: FieldSelectorSeed,
   onComplete: (result: FieldSelectorResult) => void
 ): { destroy: () => void } {
   let searchText = ""
@@ -37,6 +73,10 @@ export function createFieldSelector(
   const selectedFields = new Set<string>()
   let fieldListChildIds: string[] = []
   let selectedListChildIds: string[] = []
+
+  let AVAILABLE_FIELDS: EditableField[] = [
+    { key: "summary", label: "Summary", type: "text" },
+  ]
 
   const container = new BoxRenderable(renderer, {
     id: "field-selector-container",
@@ -140,6 +180,71 @@ export function createFieldSelector(
   })
   leftPanel.add(helpText)
 
+  function normalizeAllowedValues(values: Array<{ id?: string; name?: string; value?: string; key?: string }> | undefined): FieldOption[] {
+    if (!values) return []
+    return values.map((v) => ({
+      id: String(v.id ?? v.key ?? v.value ?? v.name ?? ""),
+      value: String(v.name ?? v.value ?? v.key ?? v.id ?? ""),
+      name: v.name,
+    }))
+  }
+
+  async function loadFields() {
+    try {
+      const key: ProjectIssueTypeKey = {
+        baseUrl: client.config.baseUrl,
+        mode: client.isCloud ? "cloud" : "onprem",
+        projectKey: seed.projectKey,
+        issueType: seed.issueType,
+      }
+      let editmeta: import("../../api").JiraEditMetaResponse | null = null
+      const cached = getCachedFields(key)
+      const mapped: EditableField[] = []
+
+      if (!cached) {
+        editmeta = await client.getIssueEditMeta(seed.issueKey)
+        putEditMeta(key, editmeta)
+        for (const [fid, f] of Object.entries(editmeta.fields)) {
+          const schema = f.schema
+          const name = f.name
+          if (!schema) continue
+          if (schema.type === "string") {
+            mapped.push({ key: name, label: name, type: "text", fieldId: fid })
+          } else {
+            const customKey = schema.custom || ""
+            const isSelect =
+              customKey.includes(":select") ||
+              customKey.includes(":multiselect") ||
+              customKey.includes(":radiobuttons") ||
+              customKey.includes(":multicheckboxes") ||
+              customKey.includes(":cascadingselect")
+            if (isSelect || f.allowedValues) {
+              mapped.push({ key: name, label: name, type: "choice", fieldId: fid, options: normalizeAllowedValues(f.allowedValues) })
+            }
+          }
+        }
+      } else {
+        for (const [fid, f] of Object.entries(cached)) {
+          const options = normalizeAllowedValues(f.allowedValues)
+          if (options.length > 0) {
+            mapped.push({ key: f.name, label: f.name, type: "choice", fieldId: fid, options })
+          } else {
+            mapped.push({ key: f.name, label: f.name, type: "text", fieldId: fid })
+          }
+        }
+      }
+
+      const hasSummary = mapped.some((m) => m.key.toLowerCase() === "summary")
+      AVAILABLE_FIELDS = [
+        { key: "summary", label: "Summary", type: "text" },
+        ...mapped.filter((m) => m.key.toLowerCase() !== "summary"),
+      ]
+      render()
+    } catch (err) {
+      render()
+    }
+  }
+
   function getFilteredFields(): EditableField[] {
     const search = searchText.toLowerCase()
     return AVAILABLE_FIELDS.filter(
@@ -230,7 +335,10 @@ export function createFieldSelector(
     renderSelectedList()
   }
 
+  // initial render with default fields
   render()
+  // load dynamic fields asynchronously
+  void loadFields()
 
   const keyHandler = (key: KeyEvent) => {
     const filtered = getFilteredFields()

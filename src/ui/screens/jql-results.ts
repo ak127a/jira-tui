@@ -167,6 +167,7 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     const response = await client.searchIssues({
       jql: jqlQuery,
       maxResults: 100,
+      fields: ["summary","status","created","issuetype","project"],
     })
 
     issues = response.issues
@@ -197,7 +198,20 @@ export async function createJqlResultsScreen(ctx: AppContext): Promise<void> {
     isInBulkEditMode = true
     const selectedKeys = Array.from(selectedIssueIndices).map((i) => issues[i].key)
 
-    createFieldSelector(renderer, mainContainer, (result) => {
+    const firstIdx = Math.min(...Array.from(selectedIssueIndices))
+    const firstIssue = issues[firstIdx]
+    const seed = {
+      issueKey: firstIssue.key,
+      projectKey: firstIssue.fields.project?.key || "",
+      issueType: firstIssue.fields.issuetype?.name || "",
+    }
+
+    if (!client) {
+      isInBulkEditMode = false
+      return
+    }
+
+    createFieldSelector(renderer, mainContainer, client, seed, (result) => {
       if (result.cancelled || result.selectedFields.length === 0) {
         isInBulkEditMode = false
         return

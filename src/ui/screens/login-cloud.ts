@@ -7,6 +7,7 @@ import {
 import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import { createJiraClient } from "../../api"
+import { logger } from "../../logging/logger"
 
 const JIRA_BLUE = "#0052CC"
 const JIRA_DARK = "#172B4D"
@@ -146,6 +147,7 @@ export function createCloudLoginScreen(ctx: AppContext): void {
     statusText.content = "Connecting to JIRA Cloud..."
 
     try {
+      logger.info("cloud_login_attempt", { baseUrl })
       ctx.config.baseUrl = baseUrl
       ctx.config.username = email
       ctx.config.password = token
@@ -156,13 +158,16 @@ export function createCloudLoginScreen(ctx: AppContext): void {
 
       statusText.fg = GREEN
       statusText.content = "✓ Connected successfully!"
+      logger.info("cloud_login_success", { baseUrl })
 
       setTimeout(() => {
         ctx.navigate("projects")
       }, 500)
     } catch (error) {
       statusText.fg = RED
-      statusText.content = `Error: ${error instanceof Error ? error.message : "Connection failed"}`
+      const errMsg = error instanceof Error ? error.message : "Connection failed"
+      statusText.content = `Error: ${errMsg}`
+      logger.error("cloud_login_failure", { baseUrl, error: errMsg })
     }
   }
 

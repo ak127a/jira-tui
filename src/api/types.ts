@@ -27,6 +27,22 @@ export interface JiraProject {
   projectTypeKey?: string
 }
 
+export interface JiraFieldSchema {
+  type?: string
+  custom?: string
+  customId?: number
+}
+
+export interface JiraField {
+  id: string
+  name: string
+  custom?: boolean
+  orderable?: boolean
+  navigable?: boolean
+  searchable?: boolean
+  schema?: JiraFieldSchema
+}
+
 export interface JiraIssueFields {
   summary: string
   status: JiraStatus
@@ -42,6 +58,11 @@ export interface JiraIssueFields {
     id: string
     name: string
     iconUrl?: string
+  }
+  project?: {
+    id?: string
+    key: string
+    name?: string
   }
 }
 
@@ -62,6 +83,29 @@ export interface JiraSearchResponse {
 export interface JiraProjectsResponse {
   values?: JiraProject[] // Cloud paginated response
   // On-prem returns array directly
+}
+
+export interface JiraEditMetaFieldOperation {
+  readonly set?: boolean
+}
+
+export interface JiraEditMetaAllowedValue {
+  readonly id?: string
+  readonly name?: string
+  readonly value?: string
+  readonly key?: string
+}
+
+export interface JiraEditMetaField {
+  readonly required: boolean
+  readonly name: string
+  readonly operations?: string[]
+  readonly allowedValues?: JiraEditMetaAllowedValue[]
+  readonly schema?: JiraFieldSchema
+}
+
+export interface JiraEditMetaResponse {
+  readonly fields: Record<string, JiraEditMetaField>
 }
 
 export interface SearchOptions {

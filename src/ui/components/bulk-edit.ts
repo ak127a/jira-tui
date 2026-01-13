@@ -43,11 +43,11 @@ export async function createBulkEditScreen(
   for (const field of fields) {
     const fv: FieldValue = { field, value: "" }
     if (field.type === "choice") {
-      const options = await client.getFieldOptions(field.key)
+      const options = field.options ?? []
       fv.options = options
-      fv.optionIndex = 0
+      fv.optionIndex = options.length > 0 ? 0 : undefined
       fv.value = options[0]?.value ?? ""
-      fv.fieldId = await client.getFieldId(field.key) ?? undefined
+      fv.fieldId = field.fieldId
     }
     fieldValues.push(fv)
   }
@@ -197,11 +197,19 @@ export async function createBulkEditScreen(
         const fieldsToUpdate: Record<string, unknown> = {}
 
         for (const fv of fieldValues) {
-          if (fv.value) {
-            if (fv.field.key === "summary") {
+          if (fv.field.type === "text") {
+            if (fv.field.key === "summary" && fv.value) {
               fieldsToUpdate.summary = fv.value
-            } else if (fv.field.key === "severity" && fv.options && fv.optionIndex !== undefined && fv.fieldId) {
-              fieldsToUpdate[fv.fieldId] = { id: fv.options[fv.optionIndex].id }
+            }
+          } else if (
+            fv.field.type === "choice" &&
+            fv.fieldId &&
+            fv.options &&
+            fv.optionIndex !== undefined
+          ) {
+            const sel = fv.options[fv.optionIndex]
+            if (sel && sel.id) {
+              fieldsToUpdate[fv.fieldId] = { id: sel.id }
             }
           }
         }

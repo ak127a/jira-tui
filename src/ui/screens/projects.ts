@@ -8,6 +8,7 @@ import {
 import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import type { JiraProject } from "../../api"
+import { logger } from "../../logging/logger"
 
 const JIRA_BLUE = "#0052CC"
 const JIRA_DARK = "#172B4D"
@@ -72,7 +73,9 @@ export async function createProjectsScreen(ctx: AppContext): Promise<void> {
   let projects: JiraProject[] = []
 
   try {
+    logger.info("projects_fetch_start")
     projects = await client.getProjects()
+    logger.info("projects_fetch_success", { count: projects.length })
     projectsBox.remove("loading")
 
     if (projects.length === 0) {
@@ -99,7 +102,9 @@ export async function createProjectsScreen(ctx: AppContext): Promise<void> {
     projectsBox.add(projectSelect)
 
     projectSelect.on(SelectRenderableEvents.ITEM_SELECTED, (index: number) => {
-      ctx.selectedProject = projects[index].key
+      const chosen = projects[index]
+      logger.info("project_selected", { key: chosen.key, name: chosen.name })
+      ctx.selectedProject = chosen.key
       ctx.navigate("issues")
     })
 
@@ -112,6 +117,7 @@ export async function createProjectsScreen(ctx: AppContext): Promise<void> {
       fg: RED,
     })
     projectsBox.add(errorText)
+    logger.error("projects_fetch_failure", { error: error instanceof Error ? error.message : String(error) })
   }
 
   const keyHandler = (key: KeyEvent) => {

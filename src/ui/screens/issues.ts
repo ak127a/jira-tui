@@ -7,6 +7,7 @@ import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import { createTable, type TableColumn, type TableRow } from "../components/table"
 import { formatDateTime, type JiraIssue } from "../../api"
+import { logger } from "../../logging/logger"
 
 const JIRA_BLUE = "#0052CC"
 const JIRA_DARK = "#172B4D"
@@ -141,12 +142,14 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
   }
 
   try {
+    logger.info("issues_fetch_start", { project: selectedProject })
     const response = await client.getProjectIssues(selectedProject, {
       maxResults: 100,
     })
 
     issues = response.issues
     totalIssues = response.total
+    logger.info("issues_fetch_success", { project: selectedProject, count: issues.length, total: totalIssues })
     contentBox.remove("loading")
 
     if (issues.length === 0) {
@@ -167,6 +170,7 @@ export async function createIssuesScreen(ctx: AppContext): Promise<void> {
       fg: RED,
     })
     contentBox.add(errorText)
+    logger.error("issues_fetch_failure", { project: selectedProject, error: error instanceof Error ? error.message : String(error) })
   }
 
   const keyHandler = (key: KeyEvent) => {
