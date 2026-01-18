@@ -1,9 +1,9 @@
 import {
   BoxRenderable,
   TextRenderable,
-  InputRenderable,
   type KeyEvent,
 } from "@opentui/core"
+import { TextField } from "opentuitui"
 import type { AppContext } from "../context"
 import { createHeader } from "../components"
 import { createJiraClient } from "../../api"
@@ -66,7 +66,7 @@ export function createCloudLoginScreen(ctx: AppContext): void {
   })
   loginBox.add(baseUrlLabel)
 
-  const baseUrlInput = new InputRenderable(renderer, {
+  const baseUrlInput = new TextField(renderer, {
     id: "baseurl-input",
     width: 45,
     placeholder: "company.atlassian.net",
@@ -83,7 +83,7 @@ export function createCloudLoginScreen(ctx: AppContext): void {
   })
   loginBox.add(emailLabel)
 
-  const emailInput = new InputRenderable(renderer, {
+  const emailInput = new TextField(renderer, {
     id: "email-input",
     width: 45,
     placeholder: "you@company.com",
@@ -100,7 +100,7 @@ export function createCloudLoginScreen(ctx: AppContext): void {
   })
   loginBox.add(tokenLabel)
 
-  const tokenInput = new InputRenderable(renderer, {
+  const tokenInput = new TextField(renderer, {
     id: "token-input",
     width: 45,
     placeholder: "Paste your API token...",

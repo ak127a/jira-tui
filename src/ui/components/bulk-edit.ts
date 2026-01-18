@@ -1,10 +1,10 @@
 import {
   BoxRenderable,
   TextRenderable,
-  InputRenderable,
   type CliRenderer,
   type KeyEvent,
 } from "@opentui/core"
+import { TextField } from "opentuitui"
 import type { JiraClient, FieldOption } from "../../api"
 import type { EditableField } from "./field-selector"
 import { logger } from "../../logging/logger"
@@ -52,7 +52,7 @@ export async function createBulkEditScreen(
   let editMode: EditMode = "navigate"
   const fieldValues: FieldValue[] = []
   let fieldRowIds: string[] = []
-  let textInput: InputRenderable | null = null
+  let textInput: TextField | null = null
   let isSaving = false
 
   for (const field of fields) {
@@ -226,7 +226,7 @@ export async function createBulkEditScreen(
         const placeholder = fv.field.type === "array-text"
           ? `Enter ${fv.field.label} (comma-separated)...`
           : `Enter ${fv.field.label}...`
-        textInput = new InputRenderable(renderer, {
+        textInput = new TextField(renderer, {
           id: `field-input-${i}`,
           width: 45,
           placeholder,

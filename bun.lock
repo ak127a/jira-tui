@@ -6,6 +6,7 @@
       "name": "jiratui",
       "dependencies": {
         "@opentui/core": "^0.1.72",
+        "opentuitui": "^0.2.0",
       },
       "devDependencies": {
         "@types/bun": "latest",
@@ -143,6 +144,8 @@
     "mime": ["mime@3.0.0", "", { "bin": { "mime": "cli.js" } }, "sha512-jSCU7/VB1loIWBZe14aEYHU/+1UMEHoaO7qxCOVJOw9GgH72VAWppxNcjU+x9a2k3GSIBXNKxXQFqRvvZ7vr3A=="],
 
     "omggif": ["omggif@1.0.10", "", {}, "sha512-LMJTtvgc/nugXj0Vcrrs68Mn2D1r0zf630VNtqtpI1FEO7e+O9FP4gqs9AcnBaSEeoHIPm28u6qgPR0oyEpGSw=="],
+
+    "opentuitui": ["opentuitui@0.2.0", "", { "peerDependencies": { "@opentui/core": ">=0.1.0" } }, "sha512-+3UTYJgSNnT4+TG6TCiN1G6KC4dnw0jHhDMJOdE19UQpmZH6LBp2JrEumz6TTwTVBRjr+Ng6l2+7pt2xhkufkQ=="],
 
     "pako": ["pako@1.0.11", "", {}, "sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw=="],
 

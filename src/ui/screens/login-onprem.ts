@@ -1,10 +1,9 @@
 import {
   BoxRenderable,
   TextRenderable,
-  InputRenderable,
-  InputRenderableEvents,
   type KeyEvent,
 } from "@opentui/core"
+import { TextField } from "opentuitui"
 import { exec } from "child_process"
 import { promisify } from "util"
 import type { AppContext } from "../context"
@@ -73,7 +72,7 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
   })
   loginBox.add(baseUrlLabel)
 
-  const baseUrlInput = new InputRenderable(renderer, {
+  const baseUrlInput = new TextField(renderer, {
     id: "baseurl-input",
     width: 45,
     placeholder: "https://jira.company.com",
@@ -91,7 +90,7 @@ export function createOnPremLoginScreen(ctx: AppContext): void {
   })
   loginBox.add(usernameLabel)
 
-  const usernameInput = new InputRenderable(renderer, {
+  const usernameInput = new TextField(renderer, {
     id: "username-input",
     width: 45,
     placeholder: "Enter username...",

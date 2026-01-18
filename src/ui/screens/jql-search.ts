@@ -1,9 +1,9 @@
 import {
   BoxRenderable,
   TextRenderable,
-  InputRenderable,
   type KeyEvent,
 } from "@opentui/core"
+import { TextField } from "opentuitui"
 import type { AppContext } from "../context"
 import { createHeader } from "../components"
 
@@ -65,7 +65,7 @@ export function createJqlSearchScreen(ctx: AppContext): void {
   })
   searchBox.add(queryLabel)
 
-  const queryInput = new InputRenderable(renderer, {
+  const queryInput = new TextField(renderer, {
     id: "query-input",
     width: 60,
     placeholder: "Enter JQL query...",
